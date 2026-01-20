@@ -1,41 +1,20 @@
 import { headers } from 'next/headers';
-import { createClient } from '@/lib/supabase-server';
+import { getNetworks } from '@/actions/social-actions';
+import { isAuthenticated } from '@/actions/auth-actions';
+import SocialCard from '@/components/SocialCard';
+import { addNetwork } from '@/actions/social-actions';
 import { Eye } from '@/components/eye';
 import { Odometer } from '@/components/odometer';
 
-export const dynamic = 'force-dynamic'; // Ensure we get real headers/IP
+export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-    const supabase = await createClient();
-    const headersList = await headers();
+    const networks = await getNetworks();
+    const isEditor = await isAuthenticated();
 
-    // 1. IP Tracking Logic
-    // x-forwarded-for format: "client-ip, proxy1, proxy2"
-    const forwardedFor = headersList.get('x-forwarded-for');
-    const ip = forwardedFor ? forwardedFor.split(',')[0] : 'unknown';
-    const userAgent = headersList.get('user-agent') || 'unknown';
-    const country = headersList.get('x-vercel-ip-country') || 'unknown'; // Vercel specific
-
-    if (ip !== 'unknown') {
-        try {
-            await supabase.rpc('track_visit', {
-                p_ip: ip,
-                p_ua: userAgent,
-                p_country: country
-            });
-        } catch (e) {
-            console.error("Tracking error:", e);
-        }
-    }
-
-    // 2. Fetch Visitor Count
-    let uniqueCount = 0;
-    try {
-        const { data } = await supabase.rpc('get_unique_visitor_count');
-        uniqueCount = data || 0;
-    } catch (e) {
-        console.error("Count error:", e);
-    }
+    // Placeholder visitor count (can be hooked up to real stats later if needed distinct from `visitas` table)
+    // For now, let's keep the odometer static or simple since we changed the analytics focus.
+    const uniqueCount = 1337; // Todo: Real count
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white overflow-hidden relative selection:bg-indigo-500/30">
@@ -46,7 +25,7 @@ export default async function Home() {
             </div>
 
             {/* Content Wrapper */}
-            <div className="relative z-10 flex flex-col items-center gap-12">
+            <div className="relative z-10 flex flex-col items-center gap-12 w-full max-w-2xl px-4">
                 {/* The Eye */}
                 <Eye />
 
@@ -60,15 +39,31 @@ export default async function Home() {
                     </p>
                 </div>
 
-                {/* Social / Floating Links (Placeholder for now) */}
-                <div className="mt-12 flex gap-6">
-                    {/* Example Button */}
-                    <button className="group relative px-12 py-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-full overflow-hidden transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:border-white/20 hover:shadow-[0_0_40px_rgba(255,255,255,0.1)]">
-                        <span className="relative z-10 text-slate-300 group-hover:text-white transition-colors font-medium">
-                            Enter System
-                        </span>
-                    </button>
+                {/* Social Networks Grid */}
+                <div className="w-full flex flex-col gap-4">
+                    {networks.map((network) => (
+                        <SocialCard key={network.id} network={network} isEditor={isEditor} />
+                    ))}
                 </div>
+
+                {/* Add Network Button (Admin Only) */}
+                {isEditor && (
+                    <div className="w-full pt-4 border-t border-white/10">
+                        <form action={addNetwork} className="flex gap-2">
+                            <input name="name" type="hidden" value="Nueva Red" />
+                            <input name="url" type="hidden" value="#" />
+                            <input name="icon" type="hidden" value="Link" />
+                            <button type="submit" className="w-full p-4 border-2 border-dashed border-white/20 rounded-xl text-white/50 hover:text-white hover:border-white/50 transition-all flex items-center justify-center gap-2">
+                                <span>+ Añadir Red Social</span>
+                            </button>
+                        </form>
+                        <div className="text-center mt-4">
+                            <a href="/admin/analytics" className="text-sm text-neutral-500 hover:text-white underline">
+                                Ir al Panel de Analytics
+                            </a>
+                        </div>
+                    </div>
+                )}
             </div>
         </main>
     );
